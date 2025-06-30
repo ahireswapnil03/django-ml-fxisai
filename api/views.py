@@ -1,26 +1,14 @@
-from django.shortcuts import render
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth.hashers import make_password
-from .models import User, Product
-from .serializers import UserSerializer, ProductSerializer
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .models import Product
+from .serializers import ProductSerializer, UserRegisterSerializer
 
 # Create your views here.
 
 class RegisterAPIView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-
-    def perform_create(self, serializer):
-        serializer.save(hashed_password=make_password(self.request.data['hashed_password']))
-
-class MeAPIView(generics.RetrieveAPIView):
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self):
-        return self.request.user
+    serializer_class = UserRegisterSerializer
+    permission_classes = [AllowAny]
 
 class ProductListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
@@ -56,8 +44,8 @@ class ProductBulkCreateAPIView(generics.GenericAPIView):
         products_data = request.data.get('products', [])
         created = []
         for product_data in products_data:
-            product_data['user'] = request.user.id
+            product_data.pop('user', None)  # Ensure user is not set from client
             serializer = self.get_serializer(data=product_data)
             serializer.is_valid(raise_exception=True)
-            created.append(serializer.save())
+            created.append(serializer.save(user=request.user))
         return Response(ProductSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
